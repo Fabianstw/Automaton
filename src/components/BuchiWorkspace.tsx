@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react"
+import { type ReactNode, useMemo, useState } from "react"
 import { AlertCircle, CheckCircle2, Eraser, Sparkles, XCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { BuchiGraph } from "@/components/BuchiGraph"
+import { MathText } from "@/components/MathText"
 import { parseBuchiText, sampleBuchiInput } from "@shared/buchi"
 import { GraphEdge, GraphNode, layoutBuchiCircular } from "@/lib/buchiLayout"
 import { Input } from "@/components/ui/input"
@@ -21,7 +22,15 @@ export function BuchiWorkspace() {
     return layoutBuchiCircular(parsed.automaton)
   }, [parsed.automaton])
 
-  const wordStatus = useMemo<WordStatus>(() => {
+  const wordStatus = useMemo<WordStatus & {
+    details?: {
+      inputLatex: string
+      prefixLatex: string
+      loopLatex: string
+      cycle: string[]
+      reason: string
+    }
+  }>(() => {
     const trimmed = wordInput.trim()
 
     if (!trimmed) {
@@ -38,19 +47,33 @@ export function BuchiWorkspace() {
     }
 
     const evaluation = dbaEvaluateOmegaWord(parsed.automaton, parseResult.word)
-    const cyclePretty =
-      evaluation.cycle.length > 0 ? evaluation.cycle.join(" -> ") : "no reachable cycle"
     const prefixWord = evaluation.prefixWord || "ε"
     const loopWord = evaluation.loopWord || "ε"
+    const normalizeOmega = (word: string) => word.replace(/\^(w|ω)/gi, "^{\\omega}")
+    const toLatex = (word: string) => (word ? normalizeOmega(word) : "\\varepsilon")
 
     return evaluation.accepted
       ? {
           kind: "accepted",
-          message: `"${trimmed}" is accepted. Cycle: ${cyclePretty}. Prefix "${prefixWord}", loop "${loopWord}". ${evaluation.reason}`,
+          message: `"${trimmed}" is accepted.`,
+          details: {
+            inputLatex: toLatex(trimmed),
+            prefixLatex: toLatex(prefixWord),
+            loopLatex: toLatex(loopWord),
+            cycle: evaluation.cycle,
+            reason: evaluation.reason,
+          },
         }
       : {
           kind: "rejected",
-          message: `"${trimmed}" is rejected. Cycle: ${cyclePretty}. Prefix "${prefixWord}", loop "${loopWord}". ${evaluation.reason}`,
+          message: `"${trimmed}" is rejected.`,
+          details: {
+            inputLatex: toLatex(trimmed),
+            prefixLatex: toLatex(prefixWord),
+            loopLatex: toLatex(loopWord),
+            cycle: evaluation.cycle,
+            reason: evaluation.reason,
+          },
         }
   }, [wordInput, parsed.automaton])
 
@@ -128,8 +151,8 @@ export function BuchiWorkspace() {
       <div>
         <h3 className="text-lg font-semibold text-slate-50">Check an ω-word</h3>
         <p className="text-sm text-slate-400">
-          Enter a regex that ends with <code>^w</code> (supports <code>|</code>, <code>*</code>, <code>+</code>, parentheses). Example:
-          <code> ab(ba)^w</code>. Results appear instantly using a dummy evaluator.
+          Enter a regex that ends with <MathText expression="{}^{\omega}" /> (supports <MathText expression="|" />, <MathText expression="*" />, <MathText expression="+" />, parentheses).
+          Example: <MathText expression="ab(ba)^{\omega}" />. Results appear instantly using a dummy evaluator.
         </p>
       </div>
 
@@ -153,7 +176,13 @@ export function BuchiWorkspace() {
 
 
 
-function WordStatusBanner({ status }: { status: Exclude<WordStatus, { kind: "idle" }> }) {
+function WordStatusBanner({ status }: { status: Exclude<WordStatus, { kind: "idle" }> & { details?: {
+  inputLatex: string
+  prefixLatex: string
+  loopLatex: string
+  cycle: string[]
+  reason: string
+} } }) {
   let toneClass = "border-amber-500/30 bg-amber-500/10 text-amber-100"
   let icon = <AlertCircle className="size-4" />
   let label = "Format issue"
@@ -169,12 +198,62 @@ function WordStatusBanner({ status }: { status: Exclude<WordStatus, { kind: "idl
   }
 
   return (
-    <div className={`rounded-xl border px-3 py-3 text-sm ${toneClass}`}>
-      <div className="flex items-center gap-2 font-medium">
+    <div className={`rounded-xl border px-3 py-3 text-sm shadow-lg shadow-black/10 backdrop-blur ${toneClass}`}>
+      <div className="flex items-center gap-2 font-semibold">
         {icon}
         <span>{label}</span>
+        {status.kind !== "warning" ? (
+          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-white/80">
+            ω-word
+          </span>
+        ) : null}
       </div>
-      <p className="mt-1 text-xs text-white/80">{status.message}</p>
+
+      <p className="mt-2 text-xs text-white/85 leading-relaxed">{status.message}</p>
+
+      {status.details ? (
+        <div className="mt-3 grid gap-2 text-xs text-white/90 sm:grid-cols-2">
+          <DetailRow label="Input" value={<MathText expression={status.details.inputLatex} />} />
+          <DetailRow label="Prefix" value={<MathText expression={status.details.prefixLatex} />} />
+          <DetailRow label="Loop" value={<MathText expression={status.details.loopLatex} />} />
+          <DetailRow
+            label="Cycle"
+            value={
+              status.details.cycle.length > 0 ? (
+                <span className="font-semibold text-white">
+                  {status.details.cycle.join(" → ")}
+                </span>
+              ) : (
+                <span className="text-white/70">no reachable cycle</span>
+              )
+            }
+          />
+          <DetailRow
+            className="sm:col-span-2"
+            label="Reason"
+            value={<span className="text-white/80">{status.details.reason}</span>}
+          />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function DetailRow({
+  label,
+  value,
+  className,
+}: {
+  label: string
+  value: ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      className={`flex items-start justify-between gap-2 rounded-lg border border-white/5 bg-white/5 px-3 py-2 ${className || ""}`}
+    >
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-white/60">{label}</span>
+      <span className="text-sm">{value}</span>
     </div>
   )
 }
