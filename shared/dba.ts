@@ -1,4 +1,4 @@
-import { BuchiAutomaton } from "@/lib/buchi"
+import { BuchiAutomaton } from "./buchi"
 import { ParsedOmegaWord, RegexNode } from "./utils"
 
 type StateTransform = { map: number[]; word: string }

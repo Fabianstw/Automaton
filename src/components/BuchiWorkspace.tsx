@@ -1,18 +1,17 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { AlertCircle, CheckCircle2, Eraser, Sparkles, XCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { BuchiGraph } from "@/components/BuchiGraph"
-import { parseBuchiText, sampleBuchiInput, BuchiAutomaton } from "@/lib/buchi"
+import { parseBuchiText, sampleBuchiInput } from "@shared/buchi"
 import { GraphEdge, GraphNode, layoutBuchiCircular } from "@/lib/buchiLayout"
 import { Input } from "@/components/ui/input"
-import { parseOmegaWord, WordStatus } from "../../shared/utils"
-import { dbaEvaluateOmegaWord } from "../../shared/dba"
+import { parseOmegaWord, WordStatus } from "@shared/utils"
+import { dbaEvaluateOmegaWord } from "@shared/dba"
 
 export function BuchiWorkspace() {
   const [source, setSource] = useState(sampleBuchiInput)
   const [wordInput, setWordInput] = useState("")
-  const [wordStatus, setWordStatus] = useState<WordStatus>({ kind: "idle" })
 
   const parsed = useMemo(() => parseBuchiText(source), [source])
   const graph = useMemo(() => {
@@ -22,23 +21,20 @@ export function BuchiWorkspace() {
     return layoutBuchiCircular(parsed.automaton)
   }, [parsed.automaton])
 
-  useEffect(() => {
+  const wordStatus = useMemo<WordStatus>(() => {
     const trimmed = wordInput.trim()
 
     if (!trimmed) {
-      setWordStatus({ kind: "idle" })
-      return
+      return { kind: "idle" }
     }
 
     if (!parsed.automaton) {
-      setWordStatus({ kind: "warning", message: "Define an automaton before testing a word." })
-      return
+      return { kind: "warning", message: "Define an automaton before testing a word." }
     }
 
     const parseResult = parseOmegaWord(trimmed)
     if (!parseResult.ok) {
-      setWordStatus({ kind: "warning", message: parseResult.error })
-      return
+      return { kind: "warning", message: parseResult.error }
     }
 
     const evaluation = dbaEvaluateOmegaWord(parsed.automaton, parseResult.word)
@@ -47,17 +43,15 @@ export function BuchiWorkspace() {
     const prefixWord = evaluation.prefixWord || "ε"
     const loopWord = evaluation.loopWord || "ε"
 
-    setWordStatus(
-      evaluation.accepted
-        ? {
-            kind: "accepted",
-            message: `"${trimmed}" is accepted. Cycle: ${cyclePretty}. Prefix "${prefixWord}", loop "${loopWord}". ${evaluation.reason}`,
-          }
-        : {
-            kind: "rejected",
-            message: `"${trimmed}" is rejected. Cycle: ${cyclePretty}. Prefix "${prefixWord}", loop "${loopWord}". ${evaluation.reason}`,
-          }
-    )
+    return evaluation.accepted
+      ? {
+          kind: "accepted",
+          message: `"${trimmed}" is accepted. Cycle: ${cyclePretty}. Prefix "${prefixWord}", loop "${loopWord}". ${evaluation.reason}`,
+        }
+      : {
+          kind: "rejected",
+          message: `"${trimmed}" is rejected. Cycle: ${cyclePretty}. Prefix "${prefixWord}", loop "${loopWord}". ${evaluation.reason}`,
+        }
   }, [wordInput, parsed.automaton])
 
   const wordToneClass =

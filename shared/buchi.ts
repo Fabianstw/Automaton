@@ -28,7 +28,7 @@ function readList(line: string): string[] | null {
   const [, value] = line.split(":")
   if (!value) return null
   return value
-    .split(/[,\s]+/)
+    .split(/[\,\s]+/)
     .map((item) => item.trim())
     .filter(Boolean)
 }

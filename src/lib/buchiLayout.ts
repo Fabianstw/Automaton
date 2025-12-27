@@ -1,4 +1,4 @@
-import { BuchiAutomaton } from "./buchi"
+import { BuchiAutomaton } from "@shared/buchi"
 
 export type GraphNode = {
   id: string
