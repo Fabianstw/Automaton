@@ -18,6 +18,42 @@ import { dbaEvaluateOmegaWord } from "@shared/dba"
 import { parseBuchiText, sampleBuchiInput, type BuchiSample } from "@shared/buchi"
 import { parseOmegaWord, type WordStatus } from "@shared/utils"
 
+function regexToString(node: import("@shared/utils").RegexNode | null): string {
+  if (!node) return ""
+
+  const precMap: Record<string, number> = { union: 1, concat: 2, star: 3, plus: 3, omega: 3, literal: 4 }
+  const prec = precMap[node.kind] ?? 0
+
+  const wrap = (child: string, childPrec: number) => (childPrec < prec ? `(${child})` : child)
+
+  switch (node.kind) {
+    case "literal":
+      return node.value
+    case "concat": {
+      const parts = node.nodes.map((child) => regexToString(child))
+      return wrap(parts.join(""), 2)
+    }
+    case "union": {
+      const parts = node.nodes.map((child) => regexToString(child))
+      return wrap(parts.join("|"), 1)
+    }
+    case "star": {
+      const inner = regexToString(node.node)
+      return wrap(`${inner}*`, prec)
+    }
+    case "plus": {
+      const inner = regexToString(node.node)
+      return wrap(`${inner}+`, prec)
+    }
+    case "omega": {
+      const inner = regexToString(node.node)
+      return wrap(`${inner}^w`, prec)
+    }
+    default:
+      return ""
+  }
+}
+
 export function BuchiWorkspace() {
   const samples: BuchiSample[] = sampleBuchiInput
 
@@ -65,11 +101,17 @@ export function BuchiWorkspace() {
       return { kind: "warning", message: parseResult.error }
     }
 
+    const formattedPrefix = regexToString(parseResult.word.prefix) || "ε"
+    const formattedLoop = regexToString(parseResult.word.omega) || "ε"
+
     const evaluation = dbaEvaluateOmegaWord(parsed.automaton, parseResult.word)
-    const prefixWord = evaluation.prefixWord || "ε"
-    const loopWord = evaluation.loopWord || "ε"
-    const normalizeOmega = (word: string) => word.replace(/\^(w|ω)/gi, "^{\\omega}")
-    const toLatex = (word: string) => (word ? normalizeOmega(word) : "\\varepsilon")
+    const toLatex = (word: string) => {
+      if (!word) return "\\varepsilon"
+      return word
+        .replace(/\^(w|ω)/gi, "^{\\omega}")
+        .replace(/\+/g, "^{+}")
+        .replace(/\*/g, "^{*}")
+    }
 
     return evaluation.accepted
       ? {
@@ -77,8 +119,8 @@ export function BuchiWorkspace() {
           message: `"${trimmed}" is accepted.`,
           details: {
             inputLatex: toLatex(trimmed),
-            prefixLatex: toLatex(prefixWord),
-            loopLatex: toLatex(loopWord),
+            prefixLatex: toLatex(formattedPrefix),
+            loopLatex: toLatex(`${formattedLoop}^{\\omega}`),
             cycle: evaluation.cycle,
             reason: evaluation.reason,
           },
@@ -88,8 +130,8 @@ export function BuchiWorkspace() {
           message: `"${trimmed}" is rejected.`,
           details: {
             inputLatex: toLatex(trimmed),
-            prefixLatex: toLatex(prefixWord),
-            loopLatex: toLatex(loopWord),
+            prefixLatex: toLatex(formattedPrefix),
+            loopLatex: toLatex(`${formattedLoop}^{\\omega}`),
             cycle: evaluation.cycle,
             reason: evaluation.reason,
           },
@@ -151,7 +193,6 @@ export function BuchiWorkspace() {
           <div className="space-y-3 lg:col-span-5">
             <label className="text-sm font-medium text-slate-100" htmlFor="buchi-input">
               Automaton definition
-              <div className="text-xs text-slate-400">Pick an example and tweak as needed.</div>
             </label>
             <textarea
               id="buchi-input"
@@ -194,7 +235,7 @@ export function BuchiWorkspace() {
           <h3 className="text-lg font-semibold text-slate-50">Check an ω-word</h3>
           <p className="text-sm text-slate-400">
             Enter a regex that ends with <MathText expression="{}^{\omega}" /> (supports <MathText expression="|" />, <MathText expression="*" />, <MathText expression="+" />, parentheses).
-            Example: <MathText expression="ab(ba)^{\omega}" />. Results appear instantly using a dummy evaluator.
+            Example: <MathText expression="ab(ba)^{\omega}" />.
           </p>
         </div>
 

@@ -25,6 +25,10 @@ export function dbaEvaluateOmegaWord(
   const prefixTransforms = evaluateRegex(word.prefix, letterTransforms, automaton.states.length)
   const loopTransforms = evaluateRegex(word.omega, letterTransforms, automaton.states.length)
 
+  // Prefer longer concrete prefixes when multiple options exist (e.g., b* yields "", "b", "bb", ...).
+  // This keeps displayed prefixes non-empty when possible.
+  const orderedPrefixes = [...prefixTransforms].sort((a, b) => b.word.length - a.word.length)
+
   const initialIndex = stateToIndex.get(automaton.initial)
   if (initialIndex === undefined) {
     return {
@@ -39,7 +43,7 @@ export function dbaEvaluateOmegaWord(
 
   let fallback: DbaCycleEvaluation | null = null
 
-  for (const prefix of prefixTransforms) {
+  for (const prefix of orderedPrefixes) {
     const prefixRun = runWord(prefix.word, initialIndex, step)
     if (!prefixRun) continue
 
