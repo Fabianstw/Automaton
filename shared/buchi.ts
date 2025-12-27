@@ -12,7 +12,19 @@ export type BuchiAutomaton = {
   transitions: BuchiTransition[]
 }
 
-export const sampleBuchiInput = `states: q0,q1,q2
+export type BuchiSample = {
+  id: string
+  title: string
+  languageLatex?: string
+  source: string
+}
+
+export const sampleBuchiInput: BuchiSample[] = [
+  {
+    id: "baseline",
+    title: "Baseline sample",
+    languageLatex: "\\text{Reference automaton}",
+    source: `states: q0,q1,q2
 alphabet: a,b
 start: q0
 accept: q2
@@ -22,7 +34,70 @@ q0,b->q0
 q1,a->q2
 q1,b->q0
 q2,a->q2
-q2,b->q0`
+q2,b->q0`,
+  },
+  {
+    id: "finitely-many-a",
+    title: "Finitely many a (eventually only b)",
+    languageLatex: "L = \\{ w \\in \\{a,b\\}^{\\omega} \\mid a \\text{ occurs finitely often} \\}",
+    source: `states: q0,q1
+alphabet: a,b
+start: q0
+accept: q1
+transitions:
+q0,a->q0
+q0,b->q1
+q1,a->q0
+q1,b->q1`,
+  },
+  {
+    id: "pure-b",
+    title: "Only b forever (b^ω)",
+    languageLatex: "L = b^{\\omega}",
+    source: `states: q0,q_bad
+alphabet: a,b
+start: q0
+accept: q0
+transitions:
+q0,b->q0
+q0,a->q_bad
+q_bad,a->q_bad
+q_bad,b->q_bad`,
+  },
+  {
+    id: "ab-cycle",
+    title: "Exact pattern (ab)^ω",
+    languageLatex: "L = (ab)^{\\omega}",
+    source: `states: q0,q1,q_bad
+alphabet: a,b
+start: q0
+accept: q0,q1
+transitions:
+q0,a->q1
+q0,b->q_bad
+q1,b->q0
+q1,a->q_bad
+q_bad,a->q_bad
+q_bad,b->q_bad`,
+  },
+  {
+    id: "both-infinitely-often",
+    title: "a and b infinitely often",
+    languageLatex:
+      "L = \\{ w \\in \\{a,b\\}^{\\omega} \\mid a \\text{ and } b \\text{ occur infinitely often} \\}",
+    source: `states: q1,q2,q3
+alphabet: a,b
+start: q1
+accept: q1
+transitions:
+q1,a->q2
+q1,b->q3
+q2,a->q2
+q2,b->q3
+q3,a->q1
+q3,b->q3`,
+},
+]
 
 function readList(line: string): string[] | null {
   const [, value] = line.split(":")

@@ -1,18 +1,37 @@
 import { type ReactNode, useMemo, useState } from "react"
-import { AlertCircle, CheckCircle2, Eraser, Sparkles, XCircle } from "lucide-react"
+import { AlertCircle, CheckCircle2, ChevronDown, Eraser, XCircle } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
 import { BuchiGraph } from "@/components/BuchiGraph"
 import { MathText } from "@/components/MathText"
-import { parseBuchiText, sampleBuchiInput } from "@shared/buchi"
-import { GraphEdge, GraphNode, layoutBuchiCircular } from "@/lib/buchiLayout"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import { parseOmegaWord, WordStatus } from "@shared/utils"
+import { GraphEdge, GraphNode, layoutBuchiCircular } from "@/lib/buchiLayout"
 import { dbaEvaluateOmegaWord } from "@shared/dba"
+import { parseBuchiText, sampleBuchiInput, type BuchiSample } from "@shared/buchi"
+import { parseOmegaWord, type WordStatus } from "@shared/utils"
 
 export function BuchiWorkspace() {
-  const [source, setSource] = useState(sampleBuchiInput)
+  const samples: BuchiSample[] = sampleBuchiInput
+
+  const [source, setSource] = useState(samples[0]?.source ?? "")
   const [wordInput, setWordInput] = useState("")
+  const [selectedSampleId, setSelectedSampleId] = useState<string>(samples[0]?.id ?? "")
+
+  const applySample = (id: string) => {
+    const picked = samples.find((s) => s.id === id)
+    if (!picked) return
+    setSelectedSampleId(id)
+    setSource(picked.source)
+    // keep current ω-word untouched
+  }
 
   const parsed = useMemo(() => parseBuchiText(source), [source])
   const graph = useMemo(() => {
@@ -88,101 +107,128 @@ export function BuchiWorkspace() {
 
   return (
     <>
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-50">Deterministic Buchi Automaton</h2>
-          <p className="text-sm text-slate-300">Enter the DSL on the left; the graph updates on the right.</p>
-        </div>
-        <div className="flex gap-2 self-start lg:self-auto">
-          <Button variant="secondary" size="sm" onClick={() => setSource("")}>
-            <Eraser className="size-4" />
-            Clear
-          </Button>
-          <Button size="sm" onClick={() => setSource(sampleBuchiInput)}>
-            <Sparkles className="size-4" />
-            Load sample
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-12">
-        <div className="space-y-3 lg:col-span-5">
-          <label className="text-sm font-medium text-slate-100" htmlFor="buchi-input">
-            Automaton definition
-          </label>
-          <textarea
-            id="buchi-input"
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            spellCheck={false}
-            className="h-64 w-full resize-none rounded-lg border border-slate-700 bg-slate-950 px-3 py-3 font-mono text-sm text-slate-100 focus:border-cyan-400/60 focus:outline-none focus:ring-1 focus:ring-cyan-400/50"
-            placeholder="states: q0,q1\nalphabet: a,b\nstart: q0\naccept: q1\ntransitions:\nq0,a->q1\nq1,a->q1"
-          />
-          {parsed.errors.length > 0 ? (
-            <div className="flex flex-col gap-2 rounded-lg border border-orange-500/30 bg-orange-500/10 p-3 text-sm text-orange-100">
-              <div className="flex items-center gap-2 font-semibold">
-                <AlertCircle className="size-4" /> Issues detected
-              </div>
-              <ul className="list-disc space-y-1 pl-5 text-orange-100/90">
-                {parsed.errors.map((err) => (
-                  <li key={err}>{err}</li>
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-50">Deterministic Buchi Automaton</h2>
+            <p className="text-sm text-slate-300">Enter the DSL on the left; the graph updates on the right.</p>
+          </div>
+          <div className="flex gap-2 self-start lg:self-auto">
+            <Button variant="secondary" size="sm" onClick={() => setSource("")}>
+              <Eraser className="size-4" />
+              Clear
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="border-cyan-500/40 text-slate-100">
+                  <span>{selectedSampleId ? "Examples" : "Pick example"}</span>
+                  <ChevronDown className="ml-1.5 size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="min-w-[260px] bg-slate-900 text-slate-50">
+                <DropdownMenuLabel className="text-xs uppercase tracking-wide text-slate-400">
+                  DBA examples
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-slate-800" />
+                {samples.map((sample) => (
+                  <DropdownMenuItem
+                    key={sample.id}
+                    className="flex flex-col items-start gap-1 text-left"
+                    onSelect={() => applySample(sample.id)}
+                  >
+                    <span className="text-sm font-semibold text-white">{sample.title}</span>
+                    {sample.languageLatex ? (
+                      <span className="text-[11px] text-slate-300"><MathText expression={sample.languageLatex} /></span>
+                    ) : null}
+                  </DropdownMenuItem>
                 ))}
-              </ul>
-            </div>
-          ) : null}
-
-          {parsed.automaton ? (
-            <div className="grid grid-cols-2 gap-3 text-sm text-slate-200">
-              <InfoPill label="States" value={parsed.automaton.states.join(", ")} />
-              <InfoPill label="Alphabet" value={parsed.automaton.alphabet.join(", ")} />
-              <InfoPill label="Start" value={parsed.automaton.initial} />
-              <InfoPill label="Accepting" value={parsed.automaton.accepting.join(", ")} />
-            </div>
-          ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
-        <div className="lg:col-span-7">
-          <BuchiGraph nodes={graph.nodes} edges={graph.edges} hasData={Boolean(parsed.automaton)} />
+        <div className="grid gap-4 lg:grid-cols-12">
+          <div className="space-y-3 lg:col-span-5">
+            <label className="text-sm font-medium text-slate-100" htmlFor="buchi-input">
+              Automaton definition
+              <div className="text-xs text-slate-400">Pick an example and tweak as needed.</div>
+            </label>
+            <textarea
+              id="buchi-input"
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              spellCheck={false}
+              className="h-64 w-full resize-none rounded-lg border border-slate-700 bg-slate-950 px-3 py-3 font-mono text-sm text-slate-100 focus:border-cyan-400/60 focus:outline-none focus:ring-1 focus:ring-cyan-400/50"
+              placeholder="states: q0,q1\nalphabet: a,b\nstart: q0\naccept: q1\ntransitions:\nq0,a->q1\nq1,a->q1"
+            />
+            {parsed.errors.length > 0 ? (
+              <div className="flex flex-col gap-2 rounded-lg border border-orange-500/30 bg-orange-500/10 p-3 text-sm text-orange-100">
+                <div className="flex items-center gap-2 font-semibold">
+                  <AlertCircle className="size-4" /> Issues detected
+                </div>
+                <ul className="list-disc space-y-1 pl-5 text-orange-100/90">
+                  {parsed.errors.map((err) => (
+                    <li key={err}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {parsed.automaton ? (
+              <div className="grid grid-cols-2 gap-3 text-sm text-slate-200">
+                <InfoPill label="States" value={parsed.automaton.states.join(", ")} />
+                <InfoPill label="Alphabet" value={parsed.automaton.alphabet.join(", ")} />
+                <InfoPill label="Start" value={parsed.automaton.initial} />
+                <InfoPill label="Accepting" value={parsed.automaton.accepting.join(", ")} />
+              </div>
+            ) : null}
+          </div>
+
+          <div className="lg:col-span-7">
+            <BuchiGraph nodes={graph.nodes} edges={graph.edges} hasData={Boolean(parsed.automaton)} />
+          </div>
         </div>
       </div>
-    </div>
-    <section className="mt-8 space-y-4 rounded-2xl border border-slate-800/60 bg-slate-950/60 p-5">
-      <div>
-        <h3 className="text-lg font-semibold text-slate-50">Check an ω-word</h3>
-        <p className="text-sm text-slate-400">
-          Enter a regex that ends with <MathText expression="{}^{\omega}" /> (supports <MathText expression="|" />, <MathText expression="*" />, <MathText expression="+" />, parentheses).
-          Example: <MathText expression="ab(ba)^{\omega}" />. Results appear instantly using a dummy evaluator.
-        </p>
-      </div>
+      <section className="mt-8 space-y-4 rounded-2xl border border-slate-800/60 bg-slate-950/60 p-5">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-50">Check an ω-word</h3>
+          <p className="text-sm text-slate-400">
+            Enter a regex that ends with <MathText expression="{}^{\omega}" /> (supports <MathText expression="|" />, <MathText expression="*" />, <MathText expression="+" />, parentheses).
+            Example: <MathText expression="ab(ba)^{\omega}" />. Results appear instantly using a dummy evaluator.
+          </p>
+        </div>
 
-      <div>
-        <Input
-          value={wordInput}
-          onChange={(event) => setWordInput(event.target.value)}
-          placeholder="ab(ba)^w"
-          aria-label="ω-word to test"
-          className={`${wordToneClass}`.trim()}
-        />
-      </div>
+        <div>
+          <Input
+            value={wordInput}
+            onChange={(event) => setWordInput(event.target.value)}
+            placeholder="ab(ba)^w"
+            aria-label="ω-word to test"
+            className={`${wordToneClass}`.trim()}
+          />
+        </div>
 
-      {wordStatus.kind !== "idle" ? (
-        <WordStatusBanner status={wordStatus} />
-      ) : null}
-    </section>
+        {wordStatus.kind !== "idle" ? (
+          <WordStatusBanner status={wordStatus} />
+        ) : null}
+      </section>
     </>
   )
 }
 
-
-
-function WordStatusBanner({ status }: { status: Exclude<WordStatus, { kind: "idle" }> & { details?: {
-  inputLatex: string
-  prefixLatex: string
-  loopLatex: string
-  cycle: string[]
-  reason: string
-} } }) {
+function WordStatusBanner({
+  status,
+}: {
+  status: Exclude<WordStatus, { kind: "idle" }> & {
+    details?: {
+      inputLatex: string
+      prefixLatex: string
+      loopLatex: string
+      cycle: string[]
+      reason: string
+    }
+  }
+}) {
   let toneClass = "border-amber-500/30 bg-amber-500/10 text-amber-100"
   let icon = <AlertCircle className="size-4" />
   let label = "Format issue"
@@ -209,7 +255,7 @@ function WordStatusBanner({ status }: { status: Exclude<WordStatus, { kind: "idl
         ) : null}
       </div>
 
-      <p className="mt-2 text-xs text-white/85 leading-relaxed">{status.message}</p>
+      <p className="mt-2 text-xs leading-relaxed text-white/85">{status.message}</p>
 
       {status.details ? (
         <div className="mt-3 grid gap-2 text-xs text-white/90 sm:grid-cols-2">
@@ -220,9 +266,7 @@ function WordStatusBanner({ status }: { status: Exclude<WordStatus, { kind: "idl
             label="Cycle"
             value={
               status.details.cycle.length > 0 ? (
-                <span className="font-semibold text-white">
-                  {status.details.cycle.join(" → ")}
-                </span>
+                <span className="font-semibold text-white">{status.details.cycle.join(" → ")}</span>
               ) : (
                 <span className="text-white/70">no reachable cycle</span>
               )
@@ -239,15 +283,7 @@ function WordStatusBanner({ status }: { status: Exclude<WordStatus, { kind: "idl
   )
 }
 
-function DetailRow({
-  label,
-  value,
-  className,
-}: {
-  label: string
-  value: ReactNode
-  className?: string
-}) {
+function DetailRow({ label, value, className }: { label: string; value: ReactNode; className?: string }) {
   return (
     <div
       className={`flex items-start justify-between gap-2 rounded-lg border border-white/5 bg-white/5 px-3 py-2 ${className || ""}`}
