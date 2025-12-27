@@ -1,21 +1,26 @@
-import cytoscape from "cytoscape"
-import { useEffect, useRef } from "react"
+import cytoscape from "cytoscape";
+import { useEffect, useRef } from "react";
 
-import { GraphEdge, GraphNode } from "@/lib/buchiLayout"
+import { GraphEdge, GraphNode } from "@/lib/buchiLayout";
 
 type BuchiGraphProps = {
-  nodes: GraphNode[]
-  edges: GraphEdge[]
-  hasData: boolean
-  onReady?: (cy: cytoscape.Core) => void
-}
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  hasData: boolean;
+  onReady?: (cy: cytoscape.Core) => void;
+};
 
-export function BuchiGraph({ nodes, edges, hasData, onReady }: BuchiGraphProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
+export function BuchiGraph({
+  nodes,
+  edges,
+  hasData,
+  onReady,
+}: BuchiGraphProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
+    const container = containerRef.current;
+    if (!container) return;
 
     const coreElements = nodes.map((n) => ({
       data: {
@@ -25,7 +30,7 @@ export function BuchiGraph({ nodes, edges, hasData, onReady }: BuchiGraphProps) 
         isInitial: n.isInitial ? "true" : "false",
       },
       position: { x: n.x, y: n.y },
-    }))
+    }));
 
     const edgeElements = edges.map((e) => ({
       data: {
@@ -34,13 +39,13 @@ export function BuchiGraph({ nodes, edges, hasData, onReady }: BuchiGraphProps) 
         target: e.target,
         label: e.label,
       },
-    }))
+    }));
 
     const initialMarkers = nodes.flatMap((n, index) => {
-      if (!n.isInitial) return []
+      if (!n.isInitial) return [];
 
-      const markerId = `__start-${n.id}-${index}`
-      const markerEdgeId = `__start-edge-${n.id}-${index}`
+      const markerId = `__start-${n.id}-${index}`;
+      const markerEdgeId = `__start-edge-${n.id}-${index}`;
 
       return [
         {
@@ -55,10 +60,10 @@ export function BuchiGraph({ nodes, edges, hasData, onReady }: BuchiGraphProps) 
           classes: "initial-edge",
           selectable: false,
         },
-      ]
-    })
+      ];
+    });
 
-    const elements = [...coreElements, ...edgeElements, ...initialMarkers]
+    const elements = [...coreElements, ...edgeElements, ...initialMarkers];
 
     const cy = cytoscape({
       container,
@@ -138,16 +143,16 @@ export function BuchiGraph({ nodes, edges, hasData, onReady }: BuchiGraphProps) 
           },
         },
       ],
-    })
+    });
 
     if (onReady) {
-      onReady(cy)
+      onReady(cy);
     }
 
     return () => {
-      cy.destroy()
-    }
-  }, [nodes, edges])
+      cy.destroy();
+    };
+  }, [nodes, edges]);
 
   return (
     <div className="relative h-[440px] w-full overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
@@ -158,5 +163,5 @@ export function BuchiGraph({ nodes, edges, hasData, onReady }: BuchiGraphProps) 
       ) : null}
       <div ref={containerRef} className="h-full w-full" />
     </div>
-  )
+  );
 }

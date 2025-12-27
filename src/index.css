@@ -5,7 +5,13 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  font-family: "Space Grotesk", "Inter", "SF Pro Display", system-ui, -apple-system, sans-serif;
+  font-family:
+    "Space Grotesk",
+    "Inter",
+    "SF Pro Display",
+    system-ui,
+    -apple-system,
+    sans-serif;
   line-height: 1.5;
   font-weight: 500;
   font-synthesis: none;
@@ -95,13 +101,24 @@
   body {
     margin: 0;
     min-height: 100vh;
-    background: radial-gradient(circle at 20% 20%, rgba(34, 211, 238, 0.06), transparent 30%),
-      radial-gradient(circle at 80% 0%, rgba(16, 185, 129, 0.05), transparent 25%),
+    background:
+      radial-gradient(
+        circle at 20% 20%,
+        rgba(34, 211, 238, 0.06),
+        transparent 30%
+      ),
+      radial-gradient(
+        circle at 80% 0%,
+        rgba(16, 185, 129, 0.05),
+        transparent 25%
+      ),
       var(--background);
     color: var(--foreground);
   }
 
   code {
-    font-family: "Space Grotesk", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-family:
+      "Space Grotesk", "SFMono-Regular", Menlo, Monaco, Consolas,
+      "Liberation Mono", "Courier New", monospace;
   }
 }

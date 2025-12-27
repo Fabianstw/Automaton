@@ -1,9 +1,14 @@
-import { Navigate, Route, Routes, BrowserRouter as Router } from "react-router-dom"
+import {
+  Navigate,
+  Route,
+  Routes,
+  BrowserRouter as Router,
+} from "react-router-dom";
 
-import { DBAPage } from "@/components/DBAPage"
-import { NBAPage } from "@/components/NBAPage"
-import { Navbar } from "@/components/Navbar"
-import { PlaceholderPage } from "@/components/PlaceholderPage"
+import { DBAPage } from "@/components/DBAPage";
+import { NBAPage } from "@/components/NBAPage";
+import { Navbar } from "@/components/Navbar";
+import { PlaceholderPage } from "@/components/PlaceholderPage";
 
 function App() {
   return (
@@ -15,12 +20,20 @@ function App() {
             <Route path="/" element={<Navigate to="/dba" replace />} />
             <Route path="/dba" element={<DBAPage />} />
             <Route path="/nba" element={<NBAPage />} />
-            <Route path="*" element={<PlaceholderPage title="Not found" note="Route does not exist." />} />
+            <Route
+              path="*"
+              element={
+                <PlaceholderPage
+                  title="Not found"
+                  note="Route does not exist."
+                />
+              }
+            />
           </Routes>
         </main>
       </div>
     </Router>
-  )
+  );
 }
 
-export default App
+export default App;
