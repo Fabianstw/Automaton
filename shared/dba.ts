@@ -25,10 +25,6 @@ export function dbaEvaluateOmegaWord(
   const prefixTransforms = evaluateRegex(word.prefix, letterTransforms, automaton.states.length)
   const loopTransforms = evaluateRegex(word.omega, letterTransforms, automaton.states.length)
 
-  // Prefer longer concrete prefixes when multiple options exist (e.g., b* yields "", "b", "bb", ...).
-  // This keeps displayed prefixes non-empty when possible.
-  const orderedPrefixes = [...prefixTransforms].sort((a, b) => b.word.length - a.word.length)
-
   const initialIndex = stateToIndex.get(automaton.initial)
   if (initialIndex === undefined) {
     return {
@@ -41,16 +37,42 @@ export function dbaEvaluateOmegaWord(
     }
   }
 
-  let fallback: DbaCycleEvaluation | null = null
+  let sampleAccept: DbaCycleEvaluation | null = null
 
-  for (const prefix of orderedPrefixes) {
+  for (const prefix of prefixTransforms) {
     const prefixRun = runWord(prefix.word, initialIndex, step)
-    if (!prefixRun) continue
+    if (!prefixRun) {
+      return {
+        accepted: false,
+        cycle: [],
+        prefixWord: prefix.word,
+        loopWord: "",
+        entryState: automaton.initial,
+        reason: "Prefix causes the run to get stuck.",
+      }
+    }
+
+    let acceptingForPrefix: DbaCycleEvaluation | null = null
+    let firstNonAccepting: DbaCycleEvaluation | null = null
+    let sawLoop = false
 
     for (const loop of loopTransforms) {
       const loopCycle = findPeriodicCycle(prefixRun.state, loop.word, step)
-      if (!loopCycle) continue
+      if (!loopCycle) {
+        if (!firstNonAccepting) {
+          firstNonAccepting = {
+            accepted: false,
+            cycle: [],
+            prefixWord: prefix.word,
+            loopWord: loop.word,
+            entryState: indexToState[prefixRun.state],
+            reason: "Loop causes the run to get stuck.",
+          }
+        }
+        continue
+      }
 
+      sawLoop = true
       const cycleNames = loopCycle.cycleStates.map((idx) => indexToState[idx])
       const hasAccepting = loopCycle.cycleStates.some((idx) => acceptingSet.has(indexToState[idx]))
 
@@ -64,17 +86,35 @@ export function dbaEvaluateOmegaWord(
       }
 
       if (hasAccepting) {
-        return result
+        acceptingForPrefix = result
+        break
       }
 
-      if (!fallback) {
-        fallback = result
+      if (!firstNonAccepting) {
+        firstNonAccepting = result
       }
+    }
+
+    if (!acceptingForPrefix) {
+      return (
+        firstNonAccepting ?? {
+          accepted: false,
+          cycle: [],
+          prefixWord: prefix.word,
+          loopWord: "",
+          entryState: indexToState[prefixRun.state],
+          reason: sawLoop ? "All cycles for this prefix avoid accepting states." : "No valid loop for this prefix.",
+        }
+      )
+    }
+
+    if (!sampleAccept) {
+      sampleAccept = acceptingForPrefix
     }
   }
 
   return (
-    fallback ?? {
+    sampleAccept ?? {
       accepted: false,
       cycle: [],
       prefixWord: "",

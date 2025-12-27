@@ -180,17 +180,13 @@ class RegexParser {
   }
 
   private parseLiteral(): RegexNode {
-    let value = ""
-    while (!this.isAtEnd() && this.isLiteralChar(this.peek())) {
-      value += this.peek()
-      this.advance()
-    }
-
-    if (!value) {
+    const char = this.peek()
+    if (!this.isLiteralChar(char)) {
       throw new RegexParseError("Expected literal.")
     }
 
-    return { kind: "literal", value }
+    this.advance()
+    return { kind: "literal", value: char }
   }
 
   private isLiteralChar(char: string): boolean {
