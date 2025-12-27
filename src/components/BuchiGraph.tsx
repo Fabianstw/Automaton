@@ -17,25 +17,48 @@ export function BuchiGraph({ nodes, edges, hasData, onReady }: BuchiGraphProps) 
     const container = containerRef.current
     if (!container) return
 
-    const elements = [
-      ...nodes.map((n) => ({
-        data: {
-          id: n.id,
-          label: n.label,
-          isAccepting: n.isAccepting ? "true" : "false",
-          isInitial: n.isInitial ? "true" : "false",
+    const coreElements = nodes.map((n) => ({
+      data: {
+        id: n.id,
+        label: n.label,
+        isAccepting: n.isAccepting ? "true" : "false",
+        isInitial: n.isInitial ? "true" : "false",
+      },
+      position: { x: n.x, y: n.y },
+    }))
+
+    const edgeElements = edges.map((e) => ({
+      data: {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        label: e.label,
+      },
+    }))
+
+    const initialMarkers = nodes.flatMap((n, index) => {
+      if (!n.isInitial) return []
+
+      const markerId = `__start-${n.id}-${index}`
+      const markerEdgeId = `__start-edge-${n.id}-${index}`
+
+      return [
+        {
+          data: { id: markerId },
+          position: { x: n.x - 55, y: n.y },
+          classes: "start-marker",
+          grabbable: false,
+          selectable: false,
         },
-        position: { x: n.x, y: n.y },
-      })),
-      ...edges.map((e) => ({
-        data: {
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          label: e.label,
+        {
+          data: { id: markerEdgeId, source: markerId, target: n.id },
+          classes: "initial-edge",
+          selectable: false,
         },
-      })),
-    ]
+      ]
+    })
+
+    const elements = [...coreElements, ...edgeElements, ...initialMarkers]
 
     const cy = cytoscape({
       container,
@@ -71,10 +94,26 @@ export function BuchiGraph({ nodes, edges, hasData, onReady }: BuchiGraphProps) 
           },
         },
         {
-          selector: 'node[isInitial = "true"]',
+          selector: "node.start-marker",
           style: {
-            "border-color": "#e2e8f0",
-            "border-width": 2,
+            width: 1,
+            height: 1,
+            opacity: 0,
+          },
+        },
+        {
+          selector: "edge.initial-edge",
+          style: {
+            width: 2.2,
+            "line-color": "#f97316",
+            "target-arrow-color": "#f97316",
+            "target-arrow-shape": "triangle",
+            "curve-style": "bezier",
+            "control-point-step-size": 24,
+            "arrow-scale": 1.3,
+            "text-opacity": 0,
+            "line-cap": "round",
+            "line-style": "solid",
           },
         },
         {
