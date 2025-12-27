@@ -7,9 +7,10 @@ type BuchiGraphProps = {
   nodes: GraphNode[]
   edges: GraphEdge[]
   hasData: boolean
+  onReady?: (cy: cytoscape.Core) => void
 }
 
-export function BuchiGraph({ nodes, edges, hasData }: BuchiGraphProps) {
+export function BuchiGraph({ nodes, edges, hasData, onReady }: BuchiGraphProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -99,6 +100,10 @@ export function BuchiGraph({ nodes, edges, hasData }: BuchiGraphProps) {
         },
       ],
     })
+
+    if (onReady) {
+      onReady(cy)
+    }
 
     return () => {
       cy.destroy()

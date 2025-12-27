@@ -1,5 +1,21 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react"
-import { AlertCircle, CheckCircle2, ChevronDown, Clock3, Download, Eraser, Save, Trash2, XCircle } from "lucide-react"
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
+import type cytoscape from "cytoscape"
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  Clock3,
+  Download,
+  Eraser,
+  FileCode,
+  FileText,
+  FileType2,
+  ImageDown,
+  Save,
+  Share2,
+  Trash2,
+  XCircle,
+} from "lucide-react"
 
 import { BuchiGraph } from "@/components/BuchiGraph"
 import { MathText } from "@/components/MathText"
@@ -16,6 +32,12 @@ import { Input } from "@/components/ui/input"
 import { GraphEdge, GraphNode, layoutBuchiCircular } from "@/lib/buchiLayout"
 import { dbaEvaluateOmegaWord } from "@shared/dba"
 import { parseBuchiText, sampleBuchiInput, type BuchiSample } from "@shared/buchi"
+import {
+  buildFormalDefinitionLatex,
+  buildTikzExport,
+  type ExportGraphEdge,
+  type ExportGraphNode,
+} from "@shared/export"
 import { parseOmegaWord, type WordStatus } from "@shared/utils"
 
 function regexToString(node: import("@shared/utils").RegexNode | null): string {
@@ -69,6 +91,7 @@ export function BuchiWorkspace() {
   const [selectedSavedId, setSelectedSavedId] = useState<string>("")
   const [wordInput, setWordInput] = useState("")
   const [selectedSampleId, setSelectedSampleId] = useState<string>(samples[0]?.id ?? "")
+  const cyRef = useRef<cytoscape.Core | null>(null)
 
   const STORAGE_KEY = "buchi-automaton-saved"
 
@@ -128,6 +151,62 @@ export function BuchiWorkspace() {
     setAutoName(entry.name)
     setLastSavedAt(entry.savedAt)
     setSelectedSavedId(entry.id)
+  }
+
+  const triggerDownload = (content: BlobPart, filename: string, mime: string) => {
+    const blob = new Blob([content], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportTxt = () => {
+    if (!source.trim()) return
+    triggerDownload(source, `${autoName || "automaton"}.txt`, "text/plain")
+  }
+
+  const exportFormalLatex = () => {
+    if (!parsed.automaton) return
+    const latex = buildFormalDefinitionLatex(parsed.automaton)
+    triggerDownload(latex, `${autoName || "automaton"}-definition.tex`, "text/x-tex")
+  }
+
+  const exportLatex = () => {
+    if (!parsed.automaton) return
+
+    const nodes: ExportGraphNode[] = graph.nodes.map((n) => ({
+      id: n.id,
+      label: n.label,
+      x: n.x,
+      y: n.y,
+      isAccepting: n.isAccepting,
+      isInitial: n.isInitial,
+    }))
+
+    const edges: ExportGraphEdge[] = graph.edges.map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      label: e.label,
+    }))
+
+    const latex = buildTikzExport(parsed.automaton, nodes, edges, { scale: 0.06 })
+    triggerDownload(latex, `${autoName || "automaton"}.tex`, "text/x-tex")
+  }
+
+  const exportPng = () => {
+    if (!parsed.automaton) return
+    const cy = cyRef.current
+    if (!cy) return
+    const dataUrl = cy.png({ full: true, scale: 2, bg: "#0f172a" })
+    if (!dataUrl) return
+    const a = document.createElement("a")
+    a.href = dataUrl
+    a.download = `${autoName || "automaton"}.png`
+    a.click()
   }
 
   const applySample = (id: string) => {
@@ -313,7 +392,14 @@ export function BuchiWorkspace() {
           </div>
 
           <div className="lg:col-span-7">
-            <BuchiGraph nodes={graph.nodes} edges={graph.edges} hasData={Boolean(parsed.automaton)} />
+            <BuchiGraph
+              nodes={graph.nodes}
+              edges={graph.edges}
+              hasData={Boolean(parsed.automaton)}
+              onReady={(cy) => {
+                cyRef.current = cy
+              }}
+            />
             <div className="mt-3 flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={saveAutomaton}>
                 <Save className="mr-2 size-4" />
@@ -360,6 +446,36 @@ export function BuchiWorkspace() {
                       </button>
                     </DropdownMenuItem>
                   ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Share2 className="mr-2 size-4" />
+                    Share / Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="min-w-[220px] bg-slate-900 text-slate-50">
+                  <DropdownMenuLabel className="text-xs uppercase tracking-wide text-slate-400">
+                    Export options
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-slate-800" />
+                  <DropdownMenuItem onSelect={exportTxt} disabled={!source.trim()} className="gap-2">
+                    <FileText className="size-4" />
+                    Export DSL (.txt)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={exportFormalLatex} disabled={!parsed.automaton} className="gap-2">
+                    <FileType2 className="size-4" />
+                    Export formal def (.tex)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={exportLatex} disabled={!parsed.automaton} className="gap-2">
+                    <FileCode className="size-4" />
+                    Export TikZ (.tex)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={exportPng} disabled={!parsed.automaton} className="gap-2">
+                    <ImageDown className="size-4" />
+                    Export graph (.png)
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
