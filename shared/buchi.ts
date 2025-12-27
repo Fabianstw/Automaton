@@ -197,6 +197,28 @@ export function parseBuchiText(input: string): {
     }
   })
 
+  if (states.length > 0 && alphabet.length > 0) {
+    const seen = new Set<string>()
+
+    for (const t of transitions) {
+      const key = `${t.from}|${t.symbol}`
+      if (seen.has(key)) {
+        errors.push(`Non-deterministic transitions from ${t.from} on symbol ${t.symbol}`)
+      } else {
+        seen.add(key)
+      }
+    }
+
+    for (const state of states) {
+      for (const symbol of alphabet) {
+        const key = `${state}|${symbol}`
+        if (!seen.has(key)) {
+          errors.push(`Missing transition from ${state} on symbol ${symbol}`)
+        }
+      }
+    }
+  }
+
   if (errors.length > 0) {
     return { errors }
   }
