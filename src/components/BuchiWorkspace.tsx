@@ -1,5 +1,5 @@
-import { type ReactNode, useMemo, useState } from "react"
-import { AlertCircle, CheckCircle2, ChevronDown, Eraser, XCircle } from "lucide-react"
+import { type ReactNode, useEffect, useMemo, useState } from "react"
+import { AlertCircle, CheckCircle2, ChevronDown, Clock3, Download, Eraser, Save, Trash2, XCircle } from "lucide-react"
 
 import { BuchiGraph } from "@/components/BuchiGraph"
 import { MathText } from "@/components/MathText"
@@ -58,8 +58,77 @@ export function BuchiWorkspace() {
   const samples: BuchiSample[] = sampleBuchiInput
 
   const [source, setSource] = useState(samples[0]?.source ?? "")
+  const [autoName, setAutoName] = useState("My automaton")
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
+  const [savedAutomata, setSavedAutomata] = useState<{
+    id: string
+    name: string
+    source: string
+    savedAt: string
+  }[]>([])
+  const [selectedSavedId, setSelectedSavedId] = useState<string>("")
   const [wordInput, setWordInput] = useState("")
   const [selectedSampleId, setSelectedSampleId] = useState<string>(samples[0]?.id ?? "")
+
+  const STORAGE_KEY = "buchi-automaton-saved"
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) return
+    try {
+      const list = JSON.parse(raw) as typeof savedAutomata
+      if (Array.isArray(list)) {
+        setSavedAutomata(list)
+        if (list[0]) {
+          setSelectedSavedId(list[0].id)
+          setLastSavedAt(list[0].savedAt)
+        }
+      }
+    } catch (error) {
+      console.error("Failed to read saved automata", error)
+    }
+  }, [])
+
+  const persistSaved = (list: typeof savedAutomata) => {
+    setSavedAutomata(list)
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
+  }
+
+  const deleteAutomaton = (id: string, name: string) => {
+    const confirmed = window.confirm(`Delete saved automaton "${name}"?`)
+    if (!confirmed) return
+    const confirmedTwice = window.confirm("Are you sure? This cannot be undone.")
+    if (!confirmedTwice) return
+    const updated = savedAutomata.filter((item) => item.id !== id)
+    persistSaved(updated)
+    if (selectedSavedId === id) {
+      setSelectedSavedId(updated[0]?.id ?? "")
+      setLastSavedAt(updated[0]?.savedAt ?? null)
+    }
+  }
+
+  const saveAutomaton = () => {
+    const entry = {
+      id: crypto.randomUUID ? crypto.randomUUID() : `auto-${Date.now()}`,
+      name: autoName || "Untitled automaton",
+      source,
+      savedAt: new Date().toISOString(),
+    }
+    const updated = [entry, ...savedAutomata].slice(0, 50)
+    persistSaved(updated)
+    setSelectedSavedId(entry.id)
+    setLastSavedAt(entry.savedAt)
+  }
+
+  const loadAutomaton = (id?: string) => {
+    const targetId = id ?? selectedSavedId
+    const entry = savedAutomata.find((item) => item.id === targetId)
+    if (!entry) return
+    setSource(entry.source)
+    setAutoName(entry.name)
+    setLastSavedAt(entry.savedAt)
+    setSelectedSavedId(entry.id)
+  }
 
   const applySample = (id: string) => {
     const picked = samples.find((s) => s.id === id)
@@ -191,6 +260,24 @@ export function BuchiWorkspace() {
 
         <div className="grid gap-4 lg:grid-cols-12">
           <div className="space-y-3 lg:col-span-5">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-100" htmlFor="automaton-name">
+                Name
+              </label>
+              <Input
+                id="automaton-name"
+                value={autoName}
+                onChange={(e) => setAutoName(e.target.value)}
+                placeholder="My automaton"
+              />
+              {lastSavedAt ? (
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <Clock3 className="size-3.5" />
+                  <span>Saved: {new Date(lastSavedAt).toLocaleString()}</span>
+                </div>
+              ) : null}
+            </div>
+
             <label className="text-sm font-medium text-slate-100" htmlFor="buchi-input">
               Automaton definition
             </label>
@@ -227,6 +314,55 @@ export function BuchiWorkspace() {
 
           <div className="lg:col-span-7">
             <BuchiGraph nodes={graph.nodes} edges={graph.edges} hasData={Boolean(parsed.automaton)} />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={saveAutomaton}>
+                <Save className="mr-2 size-4" />
+                Store automaton
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" disabled={savedAutomata.length === 0}>
+                    <Download className="mr-2 size-4" />
+                    {selectedSavedId ? "Load saved" : "No saves yet"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="min-w-[260px] bg-slate-900 text-slate-50">
+                  <DropdownMenuLabel className="text-xs uppercase tracking-wide text-slate-400">
+                    Saved automata
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-slate-800" />
+                  {savedAutomata.length === 0 ? (
+                    <DropdownMenuItem disabled className="text-slate-500">
+                      Nothing saved yet
+                    </DropdownMenuItem>
+                  ) : null}
+                  {savedAutomata.map((item) => (
+                    <DropdownMenuItem
+                      key={item.id}
+                      className="flex items-center justify-between gap-2 text-left hover:bg-slate-800/80 focus:bg-slate-800"
+                      onSelect={() => loadAutomaton(item.id)}
+                    >
+                      <div className="flex flex-col items-start gap-0.5">
+                        <span className="text-sm font-semibold text-white">{item.name}</span>
+                        <span className="text-[11px] text-slate-300">{new Date(item.savedAt).toLocaleString()}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="ml-3 rounded-md border border-slate-800/0 p-1 text-slate-400 transition hover:border-rose-500/60 hover:bg-rose-500/10 hover:text-rose-200"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          deleteAutomaton(item.id, item.name)
+                        }}
+                        aria-label={`Delete ${item.name}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </div>
