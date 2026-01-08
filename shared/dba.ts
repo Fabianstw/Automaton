@@ -12,6 +12,13 @@ export type DbaCycleEvaluation = {
   reason: string;
 };
 
+/**
+ * This function evaluates a DBA on a given ω-word (with a prefix and a looping part).
+ * Checks if there exists a cycle with a reoccurring accepting state
+ *
+ * @param automaton
+ * @param word
+ */
 export function dbaEvaluateOmegaWord(
   automaton: BuchiAutomaton,
   word: ParsedOmegaWord,
@@ -22,6 +29,8 @@ export function dbaEvaluateOmegaWord(
 
   const step = buildStep(automaton, stateToIndex);
   const letterTransforms = buildLetterTransforms(automaton, stateToIndex);
+
+  // Precompute all possible state transformations for prefix and loop parts
   const prefixTransforms = evaluateRegex(
     word.prefix,
     letterTransforms,
@@ -34,6 +43,7 @@ export function dbaEvaluateOmegaWord(
   );
 
   const initialIndex = stateToIndex.get(automaton.initial);
+  // should never happen, we check before calling this function
   if (initialIndex === undefined) {
     return {
       accepted: false,
@@ -49,6 +59,7 @@ export function dbaEvaluateOmegaWord(
 
   for (const prefix of prefixTransforms) {
     const prefixRun = runWord(prefix.word, initialIndex, step);
+    // If running the prefix word fails, we cannot proceed and return false
     if (!prefixRun) {
       return {
         accepted: false,
@@ -67,7 +78,9 @@ export function dbaEvaluateOmegaWord(
     for (const loop of loopTransforms) {
       const loopCycle = findPeriodicCycle(prefixRun.state, loop.word, step);
       if (!loopCycle) {
+        // Couldn't find a cycle for this loop word (got stuck)
         if (!firstNonAccepting) {
+          // Record the first non-accepting reason
           firstNonAccepting = {
             accepted: false,
             cycle: [],
@@ -80,12 +93,14 @@ export function dbaEvaluateOmegaWord(
         continue;
       }
 
+      // Found a cycle for this prefix+loop
       sawLoop = true;
       const cycleNames = loopCycle.cycleStates.map((idx) => indexToState[idx]);
       const hasAccepting = loopCycle.cycleStates.some((idx) =>
         acceptingSet.has(indexToState[idx]),
       );
 
+      // Store the result and if accepting return it
       const result: DbaCycleEvaluation = {
         accepted: hasAccepting,
         cycle: cycleNames,
@@ -100,11 +115,14 @@ export function dbaEvaluateOmegaWord(
         break;
       }
 
+      // if not accepting, store it as a reason if we have none yet
+      // continue iterating
       if (!firstNonAccepting) {
         firstNonAccepting = result;
       }
     }
 
+    // If no accepting cycle found for this prefix, return the first non-accepting reason
     if (!acceptingForPrefix) {
       return (
         firstNonAccepting ?? {
@@ -137,15 +155,29 @@ export function dbaEvaluateOmegaWord(
   );
 }
 
+/**
+ * Builds state transformations for each letter in the automaton's alphabet.
+ * @param automaton
+ * @param stateToIndex
+ */
 function buildLetterTransforms(
   automaton: BuchiAutomaton,
   stateToIndex: Map<string, number>,
 ): Record<string, StateTransform> {
-  const size = automaton.states.length;
   const transforms: Record<string, StateTransform> = {};
-
+  /**
+   * {
+   *   symbol: {
+   *     map: {
+   *       from state index: to state index,
+   *       ...
+   *     },
+   *     word: string (the symbol itself)
+   *   }
+   * }
+   */
   for (const symbol of automaton.alphabet) {
-    const map = Array<number>(size).fill(-1);
+    const map = Array<number>(automaton.states.length).fill(-1);
     for (const t of automaton.transitions) {
       if (t.symbol !== symbol) continue;
       const from = stateToIndex.get(t.from);
@@ -159,10 +191,21 @@ function buildLetterTransforms(
   return transforms;
 }
 
+/**
+ * Identity state transformation for a given size.
+ * @param size
+ */
 function identity(size: number): StateTransform {
   return { map: Array.from({ length: size }, (_, i) => i), word: "" };
 }
 
+/**
+ * Composes two state transformations a and b (a followed by b).
+ * The words are concatenated.
+ * The resulting transformation maps each state through a then b.
+ * @param a
+ * @param b
+ */
 function compose(a: StateTransform, b: StateTransform): StateTransform {
   const map = a.map.map((target) =>
     target === -1 ? -1 : (b.map[target] ?? -1),
@@ -170,10 +213,20 @@ function compose(a: StateTransform, b: StateTransform): StateTransform {
   return { map, word: `${a.word}${b.word}` };
 }
 
+/**
+ * Generates a unique key for a state transformation based on its mapping.
+ * @param t
+ */
 function transformKey(t: StateTransform): string {
   return t.map.join(",");
 }
 
+/**
+ * Builds a step function for the automaton.
+ * Enter a state index and a symbol, get the next state index or -1 if no transition exists.
+ * @param automaton
+ * @param stateToIndex
+ */
 function buildStep(
   automaton: BuchiAutomaton,
   stateToIndex: Map<string, number>,
@@ -191,6 +244,19 @@ function buildStep(
   return (state, symbol) => table[state]?.[symbol] ?? -1;
 }
 
+/**
+ * Runs a word from
+ * - a starting state index,
+ * - using a step function that maps (state index, symbol)
+ * - to next state index or -1 if stuck.
+ * Till the word ends or gets stuck.
+ *
+ * Returns the final state index or null if stuck.
+ *
+ * @param word
+ * @param start
+ * @param step
+ */
 function runWord(
   word: string,
   start: number,
@@ -204,6 +270,17 @@ function runWord(
   return { state: current };
 }
 
+/**
+ * Finds a periodic cycle starting from an entry state,
+ * by repeatedly applying the loop word.
+ *
+ * Different from lecture, here we find a cycle in the combined state+position space,
+ * to account for the fact that the loop word may not align with cycles in the automaton.
+ *
+ * @param entryState
+ * @param loopWord
+ * @param step
+ */
 function findPeriodicCycle(
   entryState: number,
   loopWord: string,
@@ -244,6 +321,12 @@ function findPeriodicCycle(
   }
 }
 
+/**
+ * By GPT again
+ * @param node
+ * @param letterTransforms
+ * @param size
+ */
 function evaluateRegex(
   node: RegexNode | null,
   letterTransforms: Record<string, StateTransform>,
